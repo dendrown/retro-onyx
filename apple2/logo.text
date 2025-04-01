@@ -1,0 +1,107 @@
+(*
+ * LOGO
+ * Onyx Technologies Logo and more!
+ *
+ * Author: Dennis Drown
+ * System: Apple II Pascal
+ *)
+PROGRAM Logo(INPUT, OUTPUT);
+USES AppleStuff, Transcend, TurtleGraphics;
+
+CONST
+  SCRNHEIGHT    = 191;          (* Number of pixels across the full screen *)
+  TEXTLINE      = 8;            (* Text line height in pixels *)
+
+TYPE
+  StatusLine = 1..2;
+
+VAR
+  Answer    : Char;             (* Input to see if user wishes to continue *)
+
+(*
+ * PrepDrawXY
+ * Outputs a string in graphics mode
+ *)
+PROCEDURE PrepDrawXY(X, Y : Integer);
+BEGIN
+  PenColor(NONE);
+  MoveTo(X, Y);
+  PenColor(WHITE)
+END; (* PrepDrawXY *)
+
+
+(*
+ * INITIALIZE
+ * Initializes globals and sets up screen and 
+ *)
+PROCEDURE Initialize;
+BEGIN
+  Answer := 'Y';
+  Randomize;
+  InitTurtle
+END; (* Initialize *)
+
+
+(*
+ * WriteXY:
+ * Outputs a string in graphics mode
+ *)
+PROCEDURE WriteXY(X, Y : Integer; TxtMsg : String);
+BEGIN
+  PrepDrawXY(X, Y);
+  WString(TxtMsg)
+END; (* WriteXY *)
+
+
+(*
+ * Status:
+ * Outputs a string in the status area (top of screen)
+ *)
+PROCEDURE Status(LineNum : StatusLine; TxtMsg : String);
+VAR
+  Y : Integer;
+
+BEGIN
+  Y := SCRNHEIGHT - (LineNum * TEXTLINE);
+  WriteXY(0, Y, '                                        ');
+  WriteXY(0, Y, TxtMsg)
+END; (* Status *)
+
+
+(*
+ * MakeCircle:
+ * Calculates the points needed for a circle, draws it, and saves the points
+ *)
+PROCEDURE MakeCircle(Radius : Integer);
+VAR
+  X, Y, RR : Integer;
+
+BEGIN
+  RR := Radius * Radius;                (* Calculate once before beginning *)
+  For X := 1 To Radius Do
+  Begin
+    Y := Round(Sqrt(RR - X*X));
+    ViewPort(X-1, X, Y-1, Y);
+    FillScreen(WHITE)
+  End
+END; (* MakeCircle *)
+
+
+(*
+ * MAIN:
+ *)
+BEGIN
+  Initialize;
+  While (Answer <> 'N') AND (Answer <>  'n') Do
+  Begin
+    Status(1, 'Welcome to Onyx!');
+    Status(2, 'We''re setting things up...');
+    MakeCircle(50);
+    Read(KEYBOARD, Answer)
+  End;
+
+  (* Say goodbye... *)
+  TextMode;
+  WriteLn;
+  WriteLn('Thank you from Onyx!');
+END.
