@@ -9,14 +9,17 @@ PROGRAM Logo(INPUT, OUTPUT);
 USES AppleStuff, Transcend, TurtleGraphics;
 
 CONST
+  CNTRRADIUS    = 140;
   SCRNHEIGHT    = 191;          (* Number of pixels across the full screen *)
   TEXTLINE      = 8;            (* Text line height in pixels *)
 
 TYPE
   StatusLine = 1..2;
+  CentreArc  = Array[1..CNTRRADIUS] of Integer;
 
 VAR
   Answer    : Char;             (* Input to see if user wishes to continue *)
+  MidArc    : CentreArc;
 
 (*
  * PrepDrawXY
@@ -72,16 +75,42 @@ END; (* Status *)
  * MakeCircle:
  * Calculates the points needed for a circle, draws it, and saves the points
  *)
-PROCEDURE MakeCircle(Radius : Integer);
+PROCEDURE MakeCircle(XCentre, YCentre, Radius : Integer; VAR ArcY : CentreArc);
 VAR
-  X, Y, RR : Integer;
+  X, Y, X00, X0, X1, Y0, Y1, RR : Integer;
 
 BEGIN
   RR := Radius * Radius;                (* Calculate once before beginning *)
   For X := 1 To Radius Do
   Begin
+    (* NE Quadrant *)
+    X0 := XCentre + X;
+    X1 := X0 + 1;
+    X00 := X0;                          (* We'll need X0 value again for SE *)
+
     Y := Round(Sqrt(RR - X*X));
-    ViewPort(X-1, X, Y-1, Y);
+    ArcY[X] := Y;                       (* Save arc for redrawing next time *)
+    Y0 := YCentre + Y;
+    Y1 := Y0 + 1;
+    ViewPort(X0, X1, Y0, Y1);
+    FillScreen(WHITE);
+
+    (* NW Quadrant *)
+    X0 := XCentre - X;
+    X1 := X0 + 1;
+    ViewPort(X0, X1, Y0, Y1);
+    FillScreen(WHITE);
+
+    (* SW Quadrant *)
+    Y0 := YCentre - Y;
+    Y1 := Y0 + 1;
+    ViewPort(X0, X1, Y0, Y1);
+    FillScreen(WHITE);
+
+    (* SE Quadrant *)
+    Y0 := YCentre - ArcY[X];
+    Y1 := Y0 + 1;
+    ViewPort(X00, X00+1, Y0, Y1);
     FillScreen(WHITE)
   End
 END; (* MakeCircle *)
@@ -96,7 +125,7 @@ BEGIN
   Begin
     Status(1, 'Welcome to Onyx!');
     Status(2, 'We''re setting things up...');
-    MakeCircle(50);
+    MakeCircle(CNTRRADIUS, 95, 50, MidArc);
     Read(KEYBOARD, Answer)
   End;
 
