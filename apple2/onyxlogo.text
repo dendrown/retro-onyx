@@ -1,25 +1,41 @@
 (*
- * LOGO
- * Onyx Technologies Logo and more!
+ * ONYXLOGO
+ * Onyx Technologies logo and more!
  *
  * Author: Dennis Drown
  * System: Apple II Pascal
  *)
-PROGRAM Logo(INPUT, OUTPUT);
+PROGRAM OnyxLogo(INPUT, OUTPUT);
 USES AppleStuff, Transcend, TurtleGraphics;
 
 CONST
-  CNTRRADIUS    = 140;
-  SCRNHEIGHT    = 191;          (* Number of pixels across the full screen *)
+  RADIUS1       = 10;           (* Four concentric circles, start @ innermost *)
+  RADIUS2       = 30;           (* ... *)
+  RADIUS3       = 50;           (* ... *)
+  RADIUS4       = 70;           (* And end @ the outermost *)
+  NUMCIRCLES    = 4;
+  XMAX          = 279;          (* Max horiz. pixel index for full screen *)
+  YMAX          = 191;          (* Max vert.  pixel index for full screen *)
+  XCENTRE       = 139;          (* XMAX div 2 *)
+  YCENTRE       = 95;           (* YMAX div 2 *)
   TEXTLINE      = 8;            (* Text line height in pixels *)
 
 TYPE
-  StatusLine = 1..2;
-  CentreArc  = Array[1..CNTRRADIUS] of Integer;
+  StatusLine    = 1..2;
+
+  (* TODO: Comupute the circles once, and redraw from NE arcs
+  ArcSegments = Array[1..RADIUS1+RADIUS2+RADIUS3+RADIUS4] of Integer;
+  *)
+  SectorArc = Array[1..RADIUS4] of Integer;
+  Blueprint = Record
+                Radii   : Array[1..NUMCIRCLES] of Integer;
+                Sectors : Array[1..NUMCIRCLES] of SectorArc; (* TODO: resize *)
+              End;
 
 VAR
   Answer    : Char;             (* Input to see if user wishes to continue *)
-  MidArc    : CentreArc;
+  I         : Integer;
+  Logo      : Blueprint;
 
 (*
  * PrepDrawXY
@@ -40,6 +56,15 @@ END; (* PrepDrawXY *)
 PROCEDURE Initialize;
 BEGIN
   Answer := 'Y';
+  With Logo Do
+  Begin
+    (* Four concentric circles, going from innermost to outermost *)
+    Radii[1] := RADIUS1;
+    Radii[2] := RADIUS2;
+    Radii[3] := RADIUS3;
+    Radii[4] := RADIUS4
+  End;
+
   Randomize;
   InitTurtle
 END; (* Initialize *)
@@ -65,7 +90,7 @@ VAR
   Y : Integer;
 
 BEGIN
-  Y := SCRNHEIGHT - (LineNum * TEXTLINE);
+  Y := YMAX - (LineNum * TEXTLINE);
   WriteXY(0, Y, '                                        ');
   WriteXY(0, Y, TxtMsg)
 END; (* Status *)
@@ -75,7 +100,7 @@ END; (* Status *)
  * MakeCircle:
  * Calculates the points needed for a circle, draws it, and saves the points
  *)
-PROCEDURE MakeCircle(XCentre, YCentre, Radius : Integer; VAR ArcY : CentreArc);
+PROCEDURE MakeCircle(XCentre, YCentre, Radius : Integer; VAR ArcY : SectorArc);
 VAR
   X, Y, X00, X0, X1, Y0, Y1, RR : Integer;
 
@@ -117,7 +142,7 @@ END; (* MakeCircle *)
 
 
 (*
- * MAIN:
+ * MAIN: Displays the Onyx logo
  *)
 BEGIN
   Initialize;
@@ -125,12 +150,16 @@ BEGIN
   Begin
     Status(1, 'Welcome to Onyx!');
     Status(2, 'We''re setting things up...');
-    MakeCircle(CNTRRADIUS, 95, 50, MidArc);
+    For I := 1 TO NUMCIRCLES Do
+      With Logo Do
+      Begin
+        MakeCircle(XCENTRE, YCENTRE, Radii[I], Sectors[I])
+      End;
     Read(KEYBOARD, Answer)
   End;
 
   (* Say goodbye... *)
   TextMode;
   WriteLn;
-  WriteLn('Thank you from Onyx!');
+  WriteLn('Thank you from Onyx Technologies!');
 END.
