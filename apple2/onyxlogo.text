@@ -5,14 +5,13 @@
  * Author: Dennis Drown
  * System: Apple II Pascal
  *)
+(*$S+*)
 PROGRAM OnyxLogo(INPUT, OUTPUT);
 USES AppleStuff, Transcend, TurtleGraphics;
 
 CONST
   RADIUS1       = 10;           (* Four concentric circles, start @ innermost *)
-  RADIUS2       = 30;           (* ... *)
-  RADIUS3       = 50;           (* ... *)
-  RADIUS4       = 70;           (* And end @ the outermost *)
+  DELTAR        = 15;           (* Expand each circle this far: 10,25,40,55 *)
   NUMCIRCLES    = 4;
   XMAX          = 279;          (* Max horiz. pixel index for full screen *)
   YMAX          = 191;          (* Max vert.  pixel index for full screen *)
@@ -21,15 +20,17 @@ CONST
   TEXTLINE      = 8;            (* Text line height in pixels *)
 
 TYPE
-  StatusLine    = 1..2;
+  StatusLine    = 1..10;
 
   (* TODO: Comupute the circles once, and redraw from NE arcs
   ArcSegments = Array[1..RADIUS1+RADIUS2+RADIUS3+RADIUS4] of Integer;
   *)
-  SectorArc = Array[1..RADIUS4] of Integer;
+ SectorArc = Array[1..130] of Integer; (* TODO: "fake" dynamic ranging *)
   Blueprint = Record
+                (* TODO: make this sane as we handle the multi-circle spec *)
                 Radii   : Array[1..NUMCIRCLES] of Integer;
-                Sectors : Array[1..NUMCIRCLES] of SectorArc; (* TODO: resize *)
+                BegArcY : Array[1..NUMCIRCLES] of SectorArc; (* TODO: resize *)
+                EndArcY : Array[1..NUMCIRCLES] of SectorArc; (* TODO: resize *)
               End;
 
 VAR
@@ -51,7 +52,7 @@ END; (* PrepDrawXY *)
 
 (*
  * INITIALIZE
- * Initializes globals and sets up screen and 
+ * Initializes globals and sets up screen and
  *)
 PROCEDURE Initialize;
 BEGIN
@@ -60,9 +61,9 @@ BEGIN
   Begin
     (* Four concentric circles, going from innermost to outermost *)
     Radii[1] := RADIUS1;
-    Radii[2] := RADIUS2;
-    Radii[3] := RADIUS3;
-    Radii[4] := RADIUS4
+    Radii[2] := Radii[1] + DELTAR;
+    Radii[3] := Radii[2] + DELTAR;
+    Radii[4] := Radii[3] + DELTAR;
   End;
 
   Randomize;
@@ -100,11 +101,32 @@ END; (* Status *)
  * MakeCircle:
  * Calculates the points needed for a circle, draws it, and saves the points
  *)
-PROCEDURE MakeCircle(XCentre, YCentre, Radius : Integer; VAR ArcY : SectorArc);
+PROCEDURE MakeCircle(XCentre, YCentre, Radius : Integer; VAR ArcY0, ArcY1 : SectorArc);
 VAR
-  X, Y, X00, X0, X1, Y0, Y1, RR : Integer;
+  X, Y, X00, X0, X1, Y0, Y1, RR, Delta : Integer;
+
+  (*
+   * ShowPort:
+   * Debug routine to display coordinates of a ViewPort
+   *)
+  PROCEDURE ShowPort;
+  VAR
+    SX, SX0, SX1, SY0, SY1, PortText : String;
+
+  BEGIN
+    If Radius = RADIUS1 Then
+    Begin
+      ViewPort(0, XMAX, 0, YMAX);       (* Undo last ViewPort *)
+      Str(X, SX);
+      Str(X0, SX0);   Str(X1, SX1);
+      Str(Y0, SY0);   Str(Y1, SY1);
+      PortText := Concat(SX,': [',SX0,',',SX1,'..',SY0,',',SY1,']');
+      Status(X, PortText)
+    End
+  END;
 
 BEGIN
+  Y1 := 0;                              (* Need "prev" value for adjustment *)
   RR := Radius * Radius;                (* Calculate once before beginning *)
   For X := 1 To Radius Do
   Begin
@@ -114,9 +136,22 @@ BEGIN
     X00 := X0;                          (* We'll need X0 value again for SE *)
 
     Y := Round(Sqrt(RR - X*X));
-    ArcY[X] := Y;                       (* Save arc for redrawing next time *)
+    ArcY0[X] := Y;                      (* Save arc for redrawing next time *)
     Y0 := YCentre + Y;
+
+    ArcY1[X] := ArcY0[X] + 1;           (* Default to nudging the ViewPort *)
     Y1 := Y0 + 1;
+
+    (* Later points adjust based on the last point *)
+    If X > 1 Then
+    Begin
+      Delta := ArcY1[X-1] - Y;
+      If Delta > 2 Then
+      Begin
+        ArcY1[X] := ArcY0[X] + Delta - 1;
+        Y1 := YCentre + ArcY1[X]
+      End
+    End;
     ViewPort(X0, X1, Y0, Y1);
     FillScreen(WHITE);
 
@@ -127,15 +162,14 @@ BEGIN
     FillScreen(WHITE);
 
     (* SW Quadrant *)
-    Y0 := YCentre - Y;
-    Y1 := Y0 + 1;
-    ViewPort(X0, X1, Y0, Y1);
+    Y0 := YCentre - ArcY0[X];
+    Y1 := YCentre - ArcY1[X];
+    ShowPort;
+    ViewPort(X0, X1, Y1, Y0);           (* Switching bottom and top *)
     FillScreen(WHITE);
 
     (* SE Quadrant *)
-    Y0 := YCentre - ArcY[X];
-    Y1 := Y0 + 1;
-    ViewPort(X00, X00+1, Y0, Y1);
+    ViewPort(X00, X00+1, Y1, Y0);       (* Bottom/top switch again *)
     FillScreen(WHITE)
   End
 END; (* MakeCircle *)
@@ -153,7 +187,7 @@ BEGIN
     For I := 1 TO NUMCIRCLES Do
       With Logo Do
       Begin
-        MakeCircle(XCENTRE, YCENTRE, Radii[I], Sectors[I])
+        MakeCircle(XCENTRE, YCENTRE, Radii[I], BegArcY[I], EndArcY[I])
       End;
     Read(KEYBOARD, Answer)
   End;
