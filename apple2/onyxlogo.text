@@ -13,6 +13,7 @@ CONST
   RADIUS1       = 10;           (* Four concentric circles, start @ innermost *)
   DELTAR        = 15;           (* Expand each circle this far: 10,25,40,55 *)
   NUMCIRCLES    = 4;
+  CIRCSECTIONS  = 10;           (* Chop a circle into this many sections *)
   XMAX          = 279;          (* Max horiz. pixel index for full screen *)
   YMAX          = 191;          (* Max vert.  pixel index for full screen *)
   XCENTRE       = 139;          (* XMAX div 2 *)
@@ -105,26 +106,6 @@ PROCEDURE MakeCircle(XCentre, YCentre, Radius : Integer; VAR ArcY0, ArcY1 : Sect
 VAR
   X, Y, X00, X0, X1, Y0, Y1, RR, Delta : Integer;
 
-  (*
-   * ShowPort:
-   * Debug routine to display coordinates of a ViewPort
-   *)
-  PROCEDURE ShowPort;
-  VAR
-    SX, SX0, SX1, SY0, SY1, PortText : String;
-
-  BEGIN
-    If Radius = RADIUS1 Then
-    Begin
-      ViewPort(0, XMAX, 0, YMAX);       (* Undo last ViewPort *)
-      Str(X, SX);
-      Str(X0, SX0);   Str(X1, SX1);
-      Str(Y0, SY0);   Str(Y1, SY1);
-      PortText := Concat(SX,': [',SX0,',',SX1,'..',SY0,',',SY1,']');
-      Status(X, PortText)
-    End
-  END;
-
 BEGIN
   Y1 := 0;                              (* Need "prev" value for adjustment *)
   RR := Radius * Radius;                (* Calculate once before beginning *)
@@ -164,7 +145,6 @@ BEGIN
     (* SW Quadrant *)
     Y0 := YCentre - ArcY0[X];
     Y1 := YCentre - ArcY1[X];
-    ShowPort;
     ViewPort(X0, X1, Y1, Y0);           (* Switching bottom and top *)
     FillScreen(WHITE);
 
@@ -176,6 +156,59 @@ END; (* MakeCircle *)
 
 
 (*
+ * MakeLogo:
+ * Draws the Onyx Logo starting at the specified (X,Y) position
+ *)
+PROCEDURE MakeLogo(X, Y : Integer);
+CONST
+  HEIGHT = 20;
+  TRACKING = 16;
+
+VAR
+  S, Section, Theta : Integer;          (* For the O [circle] *)
+  Diagonal          : Integer;          (* For the N & X *)
+  Xc, Yc, HalfHeight: Integer;          (* For the Y: (Xc,Yc) is the centre *)
+
+BEGIN
+  Section := 6;
+  Theta := 360 DIV CIRCSECTIONS;
+  Diagonal :=  Trunc(Sqrt(TRACKING*TRACKING + HEIGHT*HEIGHT)) + 2;  (* Two? *)
+  HalfHeight := HEIGHT DIV 2;
+
+  (* Give me an O *)
+  PrepDrawXY(X, Y);
+  For S := 1 to CIRCSECTIONS Do
+  Begin
+    Move(Section);
+    Turn(Theta)
+  End;
+
+  (* Give me an N *)
+  X := X + TRACKING + 1;                (* Kern wider because the O is fat *)
+  PrepDrawXY(X, Y);
+  TurnTo(90);   Move(HEIGHT);
+  TurnTo(-45);  Move(Diagonal);
+
+  (* Give me an Y *)
+  X := X + TRACKING;
+  PrepDrawXY(X + (TRACKING DIV 2), Y);
+  TurnTo(90);   Move(HalfHeight);
+  Xc := TurtleX;
+  Yc := TurtleY;
+  Turn(45);     Move(Diagonal DIV 2);
+  PrepDrawXY(Xc, Yc);
+  TurnTo(45);   Move(Diagonal DIV 4);
+
+  (* Give me an X *)
+  X := X + TRACKING - 1;                (* Kern narrower for Y-X harmony *)
+  PrepDrawXY(X, Y);
+  TurnTo(45);   Move(Diagonal);
+  PrepDrawXY(X, Y + HEIGHT);
+  TurnTo(-45);  Move(Diagonal)
+END; (* MakeLogo *)
+
+
+(*
  * MAIN: Displays the Onyx logo
  *)
 BEGIN
@@ -184,6 +217,7 @@ BEGIN
   Begin
     Status(1, 'Welcome to Onyx!');
     Status(2, 'We''re setting things up...');
+    MakeLogo(100, 40);
     For I := 1 TO NUMCIRCLES Do
       With Logo Do
       Begin
