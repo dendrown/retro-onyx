@@ -5,39 +5,25 @@
  * Author: Dennis Drown
  * System: Apple II Pascal
  *)
-(*$S+*)
+(*$S-*)
 PROGRAM OnyxLogo(INPUT, OUTPUT);
 USES AppleStuff, Transcend, TurtleGraphics;
 
 CONST
-  RADIUS1       = 10;           (* Four concentric circles, start @ innermost *)
-  DELTAR        = 15;           (* Expand each circle this far: 10,25,40,55 *)
+  RADIUS0       = 8;
+  DELTARADIUS   = 8;            (* Expand each circle this far *)
   NUMCIRCLES    = 4;
-  CIRCSECTIONS  = 10;           (* Chop a circle into this many sections *)
-  XMAX          = 279;          (* Max horiz. pixel index for full screen *)
+  XCIRCLE0      = 139;          (* Centre of circles: horizontal *)
+  YCIRCLE0      = 110;          (* Centre of circles: vertical *)
   YMAX          = 191;          (* Max vert.  pixel index for full screen *)
-  XCENTRE       = 139;          (* XMAX div 2 *)
-  YCENTRE       = 95;           (* YMAX div 2 *)
   TEXTLINE      = 8;            (* Text line height in pixels *)
 
 TYPE
-  StatusLine    = 1..10;
-
-  (* TODO: Comupute the circles once, and redraw from NE arcs
-  ArcSegments = Array[1..RADIUS1+RADIUS2+RADIUS3+RADIUS4] of Integer;
-  *)
- SectorArc = Array[1..130] of Integer; (* TODO: "fake" dynamic ranging *)
-  Blueprint = Record
-                (* TODO: make this sane as we handle the multi-circle spec *)
-                Radii   : Array[1..NUMCIRCLES] of Integer;
-                BegArcY : Array[1..NUMCIRCLES] of SectorArc; (* TODO: resize *)
-                EndArcY : Array[1..NUMCIRCLES] of SectorArc; (* TODO: resize *)
-              End;
+  StatusLine    = 1..2;
 
 VAR
   Answer    : Char;             (* Input to see if user wishes to continue *)
-  I         : Integer;
-  Logo      : Blueprint;
+  I, Radius : Integer;
 
 (*
  * PrepDrawXY
@@ -47,29 +33,9 @@ PROCEDURE PrepDrawXY(X, Y : Integer);
 BEGIN
   PenColor(NONE);
   MoveTo(X, Y);
+  TurnTo(0);
   PenColor(WHITE)
 END; (* PrepDrawXY *)
-
-
-(*
- * INITIALIZE
- * Initializes globals and sets up screen and
- *)
-PROCEDURE Initialize;
-BEGIN
-  Answer := 'Y';
-  With Logo Do
-  Begin
-    (* Four concentric circles, going from innermost to outermost *)
-    Radii[1] := RADIUS1;
-    Radii[2] := Radii[1] + DELTAR;
-    Radii[3] := Radii[2] + DELTAR;
-    Radii[4] := Radii[3] + DELTAR;
-  End;
-
-  Randomize;
-  InitTurtle
-END; (* Initialize *)
 
 
 (*
@@ -100,59 +66,46 @@ END; (* Status *)
 
 (*
  * MakeCircle:
- * Calculates the points needed for a circle, draws it, and saves the points
+ * Draws a circle. (X,Y) designates the bottom. ARC gives the length of each
+ * arc drawn as the turtle moves on the perimeter. Bigger arc, bigger circle.
  *)
-PROCEDURE MakeCircle(XCentre, YCentre, Radius : Integer; VAR ArcY0, ArcY1 : SectorArc);
+PROCEDURE MakeCircle(X, Y, Arc : Integer);
+CONST
+  MINARCS = 10;
+
 VAR
-  X, Y, X00, X0, X1, Y0, Y1, RR, Delta : Integer;
+  I, Theta  : Integer;
+  NumArcs   : Integer;
 
 BEGIN
-  Y1 := 0;                              (* Need "prev" value for adjustment *)
-  RR := Radius * Radius;                (* Calculate once before beginning *)
-  For X := 1 To Radius Do
+  NumArcs := 10; (*MINARCS + Trunc(Ln(Arc));*)
+  Theta := 360 DIV NumArcs;
+
+  PrepDrawXY(X, Y);
+  For I := 1 to NumArcs Do
   Begin
-    (* NE Quadrant *)
-    X0 := XCentre + X;
-    X1 := X0 + 1;
-    X00 := X0;                          (* We'll need X0 value again for SE *)
-
-    Y := Round(Sqrt(RR - X*X));
-    ArcY0[X] := Y;                      (* Save arc for redrawing next time *)
-    Y0 := YCentre + Y;
-
-    ArcY1[X] := ArcY0[X] + 1;           (* Default to nudging the ViewPort *)
-    Y1 := Y0 + 1;
-
-    (* Later points adjust based on the last point *)
-    If X > 1 Then
-    Begin
-      Delta := ArcY1[X-1] - Y;
-      If Delta > 2 Then
-      Begin
-        ArcY1[X] := ArcY0[X] + Delta - 1;
-        Y1 := YCentre + ArcY1[X]
-      End
-    End;
-    ViewPort(X0, X1, Y0, Y1);
-    FillScreen(WHITE);
-
-    (* NW Quadrant *)
-    X0 := XCentre - X;
-    X1 := X0 + 1;
-    ViewPort(X0, X1, Y0, Y1);
-    FillScreen(WHITE);
-
-    (* SW Quadrant *)
-    Y0 := YCentre - ArcY0[X];
-    Y1 := YCentre - ArcY1[X];
-    ViewPort(X0, X1, Y1, Y0);           (* Switching bottom and top *)
-    FillScreen(WHITE);
-
-    (* SE Quadrant *)
-    ViewPort(X00, X00+1, Y1, Y0);       (* Bottom/top switch again *)
-    FillScreen(WHITE)
+    Move(Arc);
+    Turn(Theta)
   End
 END; (* MakeCircle *)
+
+
+(*
+ * CircleByRadius:
+ * Draws a circle. (Xc,Yc) designates the centre.
+ *)
+PROCEDURE CircleByRadius(Xc, Yc, Radius : Integer);
+
+VAR
+  Arc, X, Y : Integer;
+
+BEGIN
+  Arc := Round(0.7 * Radius);
+  Y := Yc - Radius -1;
+  X := Xc - (Arc DIV 2) -1;
+
+  MakeCircle(X, Y, Arc)
+END; (* CircleByRadius *)
 
 
 (*
@@ -161,27 +114,20 @@ END; (* MakeCircle *)
  *)
 PROCEDURE MakeLogo(X, Y : Integer);
 CONST
+  ARCLEN = 6;
   HEIGHT = 20;
   TRACKING = 16;
 
 VAR
-  S, Section, Theta : Integer;          (* For the O [circle] *)
   Diagonal          : Integer;          (* For the N & X *)
   Xc, Yc, HalfHeight: Integer;          (* For the Y: (Xc,Yc) is the centre *)
 
 BEGIN
-  Section := 6;
-  Theta := 360 DIV CIRCSECTIONS;
   Diagonal :=  Trunc(Sqrt(TRACKING*TRACKING + HEIGHT*HEIGHT)) + 2;  (* Two? *)
   HalfHeight := HEIGHT DIV 2;
 
   (* Give me an O *)
-  PrepDrawXY(X, Y);
-  For S := 1 to CIRCSECTIONS Do
-  Begin
-    Move(Section);
-    Turn(Theta)
-  End;
+  MakeCircle(X, Y, ARCLEN);
 
   (* Give me an N *)
   X := X + TRACKING + 1;                (* Kern wider because the O is fat *)
@@ -200,12 +146,28 @@ BEGIN
   TurnTo(45);   Move(Diagonal DIV 4);
 
   (* Give me an X *)
-  X := X + TRACKING - 1;                (* Kern narrower for Y-X harmony *)
+  X := X + TRACKING - 2;                (* Kern narrower for Y-X harmony *)
   PrepDrawXY(X, Y);
   TurnTo(45);   Move(Diagonal);
   PrepDrawXY(X, Y + HEIGHT);
   TurnTo(-45);  Move(Diagonal)
 END; (* MakeLogo *)
+
+
+(*
+ * INITIALIZE
+ * Initializes globals and sets up screen and
+ *)
+PROCEDURE Initialize;
+BEGIN
+  Answer := 'Y';
+  Radius := RADIUS0;
+  Randomize;
+
+  InitTurtle;
+  Status(1, 'Welcome to Onyx!');
+  Status(2, 'We''re setting things up...')
+END; (* Initialize *)
 
 
 (*
@@ -215,14 +177,13 @@ BEGIN
   Initialize;
   While (Answer <> 'N') AND (Answer <>  'n') Do
   Begin
-    Status(1, 'Welcome to Onyx!');
-    Status(2, 'We''re setting things up...');
-    MakeLogo(100, 40);
     For I := 1 TO NUMCIRCLES Do
-      With Logo Do
-      Begin
-        MakeCircle(XCENTRE, YCENTRE, Radii[I], BegArcY[I], EndArcY[I])
-      End;
+    Begin
+      CircleByRadius(XCIRCLE0, YCIRCLE0, Radius);
+      Radius := Radius + DELTARADIUS;
+    End;
+
+    MakeLogo(110, 40);
     Read(KEYBOARD, Answer)
   End;
 
