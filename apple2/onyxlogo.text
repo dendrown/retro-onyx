@@ -10,20 +10,26 @@ PROGRAM OnyxLogo(INPUT, OUTPUT);
 USES AppleStuff, Transcend, TurtleGraphics;
 
 CONST
-  RADIUS0       = 8;
-  DELTARADIUS   = 8;            (* Expand each circle this far *)
   NUMCIRCLES    = 4;
-  XCIRCLE0      = 139;          (* Centre of circles: horizontal *)
-  YCIRCLE0      = 110;          (* Centre of circles: vertical *)
+  LETTERHEIGHT  = 20;
+  LETTERMARGIN  = 10;
   YMAX          = 191;          (* Max vert.  pixel index for full screen *)
   TEXTLINE      = 8;            (* Text line height in pixels *)
 
 TYPE
-  StatusLine    = 1..2;
+  (* Tweak for best results since our turtle isn't programmed do circles *)
+  CircleDef = Record
+                X, Y    : Integer;  (* Coords of first Arc at circle bottom *)
+                ArcLen  : Integer;  (* Length of an "arc" to draw the circle *)
+                ArcCnt  : Integer;  (* Num arcs in circle; use 360 multiple *)
+              End;
+  Blueprint  = Array[1..NUMCIRCLES] of CircleDef;
+  StatusLine = 1..2;
 
 VAR
   Answer    : Char;             (* Input to see if user wishes to continue *)
-  I, Radius : Integer;
+  I         : Integer;
+  Logo      : Blueprint;
 
 (*
  * PrepDrawXY
@@ -69,53 +75,30 @@ END; (* Status *)
  * Draws a circle. (X,Y) designates the bottom. ARC gives the length of each
  * arc drawn as the turtle moves on the perimeter. Bigger arc, bigger circle.
  *)
-PROCEDURE MakeCircle(X, Y, Arc : Integer);
-CONST
-  MINARCS = 10;
-
+PROCEDURE MakeCircle(X, Y, ArcLen, ArcCnt : Integer);
 VAR
   I, Theta  : Integer;
-  NumArcs   : Integer;
 
 BEGIN
-  NumArcs := 10; (*MINARCS + Trunc(Ln(Arc));*)
-  Theta := 360 DIV NumArcs;
+  Theta := 360 DIV ArcCnt;
 
   PrepDrawXY(X, Y);
-  For I := 1 to NumArcs Do
+  For I := 1 to ArcCnt Do
   Begin
-    Move(Arc);
+    Move(ArcLen);
     Turn(Theta)
   End
 END; (* MakeCircle *)
 
 
 (*
- * CircleByRadius:
- * Draws a circle. (Xc,Yc) designates the centre.
+ * MakeName:
+ * Draws the stylized Onyx name starting at the specified (X,Y) position
  *)
-PROCEDURE CircleByRadius(Xc, Yc, Radius : Integer);
-
-VAR
-  Arc, X, Y : Integer;
-
-BEGIN
-  Arc := Round(0.7 * Radius);
-  Y := Yc - Radius -1;
-  X := Xc - (Arc DIV 2) -1;
-
-  MakeCircle(X, Y, Arc)
-END; (* CircleByRadius *)
-
-
-(*
- * MakeLogo:
- * Draws the Onyx Logo starting at the specified (X,Y) position
- *)
-PROCEDURE MakeLogo(X, Y : Integer);
+PROCEDURE MakeName(X, Y : Integer);
 CONST
   ARCLEN = 6;
-  HEIGHT = 20;
+  ARCCNT = 10;
   TRACKING = 16;
 
 VAR
@@ -123,16 +106,16 @@ VAR
   Xc, Yc, HalfHeight: Integer;          (* For the Y: (Xc,Yc) is the centre *)
 
 BEGIN
-  Diagonal :=  Trunc(Sqrt(TRACKING*TRACKING + HEIGHT*HEIGHT)) + 2;  (* Two? *)
-  HalfHeight := HEIGHT DIV 2;
+  Diagonal :=  Round(Sqrt(TRACKING*TRACKING + LETTERHEIGHT*LETTERHEIGHT)) + 1;
+  HalfHeight := LETTERHEIGHT DIV 2;
 
   (* Give me an O *)
-  MakeCircle(X, Y, ARCLEN);
+  MakeCircle(X, Y, ARCLEN, ARCCNT);
 
   (* Give me an N *)
   X := X + TRACKING + 1;                (* Kern wider because the O is fat *)
   PrepDrawXY(X, Y);
-  TurnTo(90);   Move(HEIGHT);
+  TurnTo(90);   Move(LETTERHEIGHT);
   TurnTo(-45);  Move(Diagonal);
 
   (* Give me an Y *)
@@ -149,9 +132,9 @@ BEGIN
   X := X + TRACKING - 2;                (* Kern narrower for Y-X harmony *)
   PrepDrawXY(X, Y);
   TurnTo(45);   Move(Diagonal);
-  PrepDrawXY(X, Y + HEIGHT);
+  PrepDrawXY(X, Y + LETTERHEIGHT);
   TurnTo(-45);  Move(Diagonal)
-END; (* MakeLogo *)
+END; (* MakeName *)
 
 
 (*
@@ -161,8 +144,13 @@ END; (* MakeLogo *)
 PROCEDURE Initialize;
 BEGIN
   Answer := 'Y';
-  Radius := RADIUS0;
   Randomize;
+
+  (* Use a larger arc count for larger circles, but always multiples of 360 *)
+  With Logo[1] Do Begin X := 139;  Y := 100;  ArcLen :=  6;  ArcCnt := 10; End;
+  With Logo[2] Do Begin X := 137;  Y :=  87;  ArcLen := 10;  ArcCnt := 15; End;
+  With Logo[3] Do Begin X := 134;  Y :=  74;  ArcLen := 16;  ArcCnt := 15; End;
+  With Logo[4] Do Begin X := 132;  Y :=  54;  ArcLen := 20;  ArcCnt := 18; End;
 
   InitTurtle;
   Status(1, 'Welcome to Onyx!');
@@ -178,12 +166,10 @@ BEGIN
   While (Answer <> 'N') AND (Answer <>  'n') Do
   Begin
     For I := 1 TO NUMCIRCLES Do
-    Begin
-      CircleByRadius(XCIRCLE0, YCIRCLE0, Radius);
-      Radius := Radius + DELTARADIUS;
-    End;
+      With Logo[I] Do
+        MakeCircle(X, Y, ArcLen, ArcCnt);
 
-    MakeLogo(110, 40);
+    MakeName(110, Logo[NUMCIRCLES].Y - LETTERHEIGHT - LETTERMARGIN);
     Read(KEYBOARD, Answer)
   End;
 
