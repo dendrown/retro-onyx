@@ -5,7 +5,7 @@
  * Author: Dennis Drown
  * System: Apple II Pascal
  *)
-(*$S-*)
+(*$S+*)
 PROGRAM OnyxLogo(INPUT, OUTPUT);
 USES AppleStuff, Transcend, TurtleGraphics;
 
@@ -17,11 +17,13 @@ CONST
   TEXTLINE      = 8;            (* Text line height in pixels *)
 
 TYPE
-  (* Tweak for best results since our turtle isn't programmed do circles *)
-  CircleDef = Record
+  Quadrant  = (FULL, SE, NE, NW, SW);
+  CircleDef = Record (* Tweak for best results since our turtle isn't
+                        programmed do circles *)
                 X, Y    : Integer;  (* Coords of first Arc at circle bottom *)
                 ArcLen  : Integer;  (* Length of an "arc" to draw the circle *)
                 ArcCnt  : Integer;  (* Num arcs in circle; use 360 multiple *)
+                Gap     : Quadrant; (* Leave a gap in the specified quadrant *)
               End;
   Blueprint  = Array[1..NUMCIRCLES] of CircleDef;
   StatusLine = 1..2;
@@ -75,9 +77,29 @@ END; (* Status *)
  * Draws a circle. (X,Y) designates the bottom. ARC gives the length of each
  * arc drawn as the turtle moves on the perimeter. Bigger arc, bigger circle.
  *)
-PROCEDURE MakeCircle(X, Y, ArcLen, ArcCnt : Integer);
+PROCEDURE MakeCircle(X, Y, ArcLen, ArcCnt : Integer; Gap : Quadrant);
 VAR
   I, Theta  : Integer;
+
+  (* Set or lift the turtle pen depending on the Gap placement *)
+  PROCEDURE PenUpDown;
+  VAR
+    Up0, UpN : Integer;
+
+  BEGIN
+    If Gap = FULL Then
+      PenColor(WHITE)
+    Else
+    Begin
+      Up0 := Round((Ord(Gap)-1) / 4 * ArcCnt) + 2;
+      UpN := Up0 + Round(ArcCnt / 10);
+
+      If (I > Up0) AND (I < UpN) Then
+        PenColor(NONE)
+      Else
+        PenColor(WHITE)
+    End
+  END;
 
 BEGIN
   Theta := 360 DIV ArcCnt;
@@ -85,6 +107,7 @@ BEGIN
   PrepDrawXY(X, Y);
   For I := 1 to ArcCnt Do
   Begin
+    PenUpDown;
     Move(ArcLen);
     Turn(Theta)
   End
@@ -110,7 +133,7 @@ BEGIN
   HalfHeight := LETTERHEIGHT DIV 2;
 
   (* Give me an O *)
-  MakeCircle(X, Y, ARCLEN, ARCCNT);
+  MakeCircle(X, Y, ARCLEN, ARCCNT, FULL);
 
   (* Give me an N *)
   X := X + TRACKING + 1;                (* Kern wider because the O is fat *)
@@ -142,15 +165,27 @@ END; (* MakeName *)
  * Initializes globals and sets up screen and
  *)
 PROCEDURE Initialize;
+
+  (* Use a larger arc count for larger circles, but always multiples of 360 *)
+  PROCEDURE InitCircle(I, X0, Y0, Len, Cnt : Integer; Quad : Quadrant);
+  BEGIN
+    With Logo[I] Do
+    Begin
+      X := X0;          Y := Y0;
+      ArcLen := Len;    ArcCnt := Cnt;
+      Gap := Quad;
+    End;
+  END;
+
 BEGIN
   Answer := 'Y';
   Randomize;
 
   (* Use a larger arc count for larger circles, but always multiples of 360 *)
-  With Logo[1] Do Begin X := 139;  Y := 100;  ArcLen :=  6;  ArcCnt := 10; End;
-  With Logo[2] Do Begin X := 137;  Y :=  87;  ArcLen := 10;  ArcCnt := 15; End;
-  With Logo[3] Do Begin X := 134;  Y :=  74;  ArcLen := 16;  ArcCnt := 15; End;
-  With Logo[4] Do Begin X := 132;  Y :=  54;  ArcLen := 20;  ArcCnt := 18; End;
+  InitCircle(1, 139, 100,  6, 10, FULL);    (* Inner... *)
+  InitCircle(2, 137,  87, 10, 15, SW);
+  InitCircle(3, 134,  74, 16, 15, SE);
+  InitCircle(4, 132,  54, 20, 18, NW);      (* ...outer *)
 
   InitTurtle;
   Status(1, 'Welcome to Onyx!');
@@ -167,7 +202,7 @@ BEGIN
   Begin
     For I := 1 TO NUMCIRCLES Do
       With Logo[I] Do
-        MakeCircle(X, Y, ArcLen, ArcCnt);
+        MakeCircle(X, Y, ArcLen, ArcCnt, Gap);
 
     MakeName(110, Logo[NUMCIRCLES].Y - LETTERHEIGHT - LETTERMARGIN);
     Read(KEYBOARD, Answer)
