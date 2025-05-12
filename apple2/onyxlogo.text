@@ -34,16 +34,36 @@ VAR
   Logo      : Blueprint;
 
 (*
- * PrepDrawXY
- * Outputs a string in graphics mode
+ * PrepMoveXY
+ * Moves the turtle to the specified coordinates and sets the colour.
  *)
-PROCEDURE PrepDrawXY(X, Y : Integer);
+PROCEDURE PrepMoveXY(X, Y : Integer; Colour : SCREENCOLOR);
 BEGIN
   PenColor(NONE);
   MoveTo(X, Y);
   TurnTo(0);
-  PenColor(WHITE)
+  PenColor(Colour)
+END; (* MoveDrawXY *)
+
+
+(*
+ * PrepDrawXY
+ * Moves the turtle to the specified coordinates and sets up for drawing.
+ *)
+PROCEDURE PrepDrawXY(X, Y : Integer);
+BEGIN
+  PrepMoveXY(X, Y, WHITE);
 END; (* PrepDrawXY *)
+
+
+(*
+ * PrepEraseXY
+ * Moves the turtle to the specified coordinates and sets up to erase.
+ *)
+PROCEDURE PrepEraseXY(X, Y : Integer);
+BEGIN
+  PrepMoveXY(X, Y, Black);
+END; (* PrepEraseXY *)
 
 
 (*
@@ -79,21 +99,16 @@ END; (* Status *)
  *)
 PROCEDURE MakeCircle(X, Y, ArcLen, ArcCnt : Integer; Gap : Quadrant);
 VAR
-  I, Theta  : Integer;
+  I, Theta  : Integer;                  (* Segment index & angle for turn *)
+  Up0, UpN  : Integer;                  (* Segments where we lift the pen *)
 
   (* Set or lift the turtle pen depending on the Gap placement *)
   PROCEDURE PenUpDown;
-  VAR
-    Up0, UpN : Integer;
-
   BEGIN
     If Gap = FULL Then
       PenColor(WHITE)
     Else
     Begin
-      Up0 := Round((Ord(Gap)-1) / 4 * ArcCnt) + 2;
-      UpN := Up0 + Round(ArcCnt / 10);
-
       If (I > Up0) AND (I < UpN) Then
         PenColor(NONE)
       Else
@@ -103,6 +118,8 @@ VAR
 
 BEGIN
   Theta := 360 DIV ArcCnt;
+  Up0 := Round((Ord(Gap)-1) / 4 * ArcCnt) + 2;
+  UpN := Up0 + Round(ArcCnt / 10);
 
   PrepDrawXY(X, Y);
   For I := 1 to ArcCnt Do
@@ -115,10 +132,10 @@ END; (* MakeCircle *)
 
 
 (*
- * MakeName:
+ * DrawOnyx:
  * Draws the stylized Onyx name starting at the specified (X,Y) position
  *)
-PROCEDURE MakeName(X, Y : Integer);
+PROCEDURE DrawOnyx(X, Y : Integer);
 CONST
   ARCLEN = 6;
   ARCCNT = 10;
@@ -157,7 +174,30 @@ BEGIN
   TurnTo(45);   Move(Diagonal);
   PrepDrawXY(X, Y + LETTERHEIGHT);
   TurnTo(-45);  Move(Diagonal)
-END; (* MakeName *)
+END; (* DrawOnyx *)
+
+
+(*
+ * DropName:
+ * Animate the letters in Name so they fall down the side of the screen.
+ *)
+PROCEDURE DropName(Name : String);
+VAR
+  L, Y, Bottom : Integer;
+
+BEGIN
+  Bottom := 1;
+  For L := Length(Name) DownTo 1 Do
+  Begin
+    For Y := YMAX - TEXTLINE DownTo Bottom Do
+    Begin
+      PrepEraseXY(0, Y);    WChar(Name[L]);
+      PrepDrawXY(0, Y);     WChar(Name[L]);
+    End;
+    Bottom := Bottom + TEXTLINE
+  End
+END; (* DropName *)
+
 
 
 (*
@@ -204,7 +244,8 @@ BEGIN
       With Logo[I] Do
         MakeCircle(X, Y, ArcLen, ArcCnt, Gap);
 
-    MakeName(110, Logo[NUMCIRCLES].Y - LETTERHEIGHT - LETTERMARGIN);
+    DrawOnyx(110, Logo[NUMCIRCLES].Y - LETTERHEIGHT - LETTERMARGIN);
+    DropName('Dennis Drown');
     Read(KEYBOARD, Answer)
   End;
 
