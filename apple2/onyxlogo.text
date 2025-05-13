@@ -183,16 +183,23 @@ END; (* DrawOnyx *)
  *)
 PROCEDURE DropName(Name : String);
 VAR
-  L, Y, Bottom : Integer;
+  L, Y, PrevY, Bottom : Integer;
 
 BEGIN
   Bottom := 1;
   For L := Length(Name) DownTo 1 Do
   Begin
+    PrevY  := 0;
     For Y := YMAX - TEXTLINE DownTo Bottom Do
     Begin
-      PrepEraseXY(0, Y);    WChar(Name[L]);
-      PrepDrawXY(0, Y);     WChar(Name[L]);
+      If PrevY > 0 Then
+      Begin
+        PrepEraseXY(0, PrevY);
+        WChar(' ')
+      End;
+      PrepDrawXY(0, Y);
+      WChar(Name[L]);
+      PrevY := Y;
     End;
     Bottom := Bottom + TEXTLINE
   End
