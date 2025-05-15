@@ -11,13 +11,16 @@ USES AppleStuff, Transcend, TurtleGraphics;
 
 CONST
   NUMCIRCLES    = 4;
-  LETTERHEIGHT  = 20;
-  LETTERMARGIN  = 10;
+  WCHARMAX      = 40;           (* Max Turtle chars that will fit on a line *)
+  WCHARWIDTH    = 8;            (* Pixels across a WChar character *)
+  LETTERHEIGHT  = 20;           (* Pixel height of ONYX letters *)
+  LETTERMARGIN  = 10;           (* Pixel space between ONYX letters *)
   YMAX          = 191;          (* Max vert.  pixel index for full screen *)
   TEXTLINE      = 8;            (* Text line height in pixels *)
 
 TYPE
   Quadrant  = (FULL, SE, NE, NW, SW);
+  Border    = (LEFT, RIGHT);
   CircleDef = Record (* Tweak for best results since our turtle isn't
                         programmed do circles *)
                 X, Y    : Integer;  (* Coords of first Arc at circle bottom *)
@@ -81,14 +84,26 @@ END; (* WriteXY *)
  * Status:
  * Outputs a string in the status area (top of screen)
  *)
-PROCEDURE Status(LineNum : StatusLine; TxtMsg : String);
+PROCEDURE Status(LineNum : StatusLine; Msg : String);
+CONST
+  SPACES  = '                                        '; (* Fill graph screen *)
+
 VAR
-  Y : Integer;
+  Spacer    : String;
+  Y, MsgLen : Integer;
 
 BEGIN
   Y := YMAX - (LineNum * TEXTLINE);
-  WriteXY(0, Y, '                                        ');
-  WriteXY(0, Y, TxtMsg)
+  Spacer := SPACES;
+  MsgLen := Length(Msg);
+
+  (* Make sure new message erases any old message on this status line *)
+  If MsgLen < WCHARMAX Then
+    Spacer := Copy(SPACES, 1, WCHARMAX - MsgLen)
+  Else
+    Spacer := '';
+
+  WriteXY(WCHARWIDTH, Y, Concat(Msg, Spacer))
 END; (* Status *)
 
 
@@ -181,23 +196,33 @@ END; (* DrawOnyx *)
  * DropName:
  * Animate the letters in Name so they fall down the side of the screen.
  *)
-PROCEDURE DropName(Name : String);
+PROCEDURE DropName(Name : String; Side : Border);
 VAR
-  L, Y, PrevY, Bottom : Integer;
+  L, X, Y, PrevY, Bottom : Integer;
 
 BEGIN
+  (*
+   * The final letter falls all the way to the bottom & then they stack.
+   * Letters go down either the left side or the right side of the screen.
+   *)
   Bottom := 1;
+  Case Side of
+    LEFT:   X := 0;
+    RIGHT:  X := WCHARWIDTH * 34;   (* * (WCHARMAX-1) *)
+  End;
+
+  (* Run backwards through the name so the last letter is on the bottom. *)
   For L := Length(Name) DownTo 1 Do
   Begin
-    PrevY  := 0;
+    PrevY := 0;
     For Y := YMAX - TEXTLINE DownTo Bottom Do
     Begin
       If PrevY > 0 Then
       Begin
-        PrepEraseXY(0, PrevY);
+        PrepEraseXY(X, PrevY);
         WChar(' ')
       End;
-      PrepDrawXY(0, Y);
+      PrepDrawXY(X, Y);
       WChar(Name[L]);
       PrevY := Y;
     End;
@@ -236,7 +261,6 @@ BEGIN
 
   InitTurtle;
   Status(1, 'Welcome to Onyx!');
-  Status(2, 'We''re setting things up...')
 END; (* Initialize *)
 
 
@@ -252,7 +276,8 @@ BEGIN
         MakeCircle(X, Y, ArcLen, ArcCnt, Gap);
 
     DrawOnyx(110, Logo[NUMCIRCLES].Y - LETTERHEIGHT - LETTERMARGIN);
-    DropName('Dennis Drown');
+    DropName('Jane Doe', RIGHT);
+    DropName('Dennis Drown', LEFT);
     Read(KEYBOARD, Answer)
   End;
 
