@@ -10,6 +10,9 @@ PROGRAM OnyxLogo(INPUT, OUTPUT);
 USES AppleStuff, Transcend, TurtleGraphics;
 
 CONST
+  ONYXTECH      = 'Onyx Technologies';
+  TEAMFILENAME  = '$:TEAM.TEXT';
+
   NUMCIRCLES    = 4;
   WCHARMAX      = 40;           (* Max Turtle chars that will fit on a line *)
   WCHARWIDTH    = 8;            (* Pixels across a WChar character *)
@@ -21,20 +24,35 @@ CONST
 TYPE
   Quadrant  = (FULL, SE, NE, NW, SW);
   Border    = (LEFT, RIGHT);
+  StatusLine = 1..2;
+
   CircleDef = Record (* Tweak for best results since our turtle isn't
-                        programmed do circles *)
+                        programmed to do circles *)
                 X, Y    : Integer;  (* Coords of first Arc at circle bottom *)
                 ArcLen  : Integer;  (* Length of an "arc" to draw the circle *)
                 ArcCnt  : Integer;  (* Num arcs in circle; use 360 multiple *)
                 Gap     : Quadrant; (* Leave a gap in the specified quadrant *)
               End;
-  Blueprint  = Array[1..NUMCIRCLES] of CircleDef;
-  StatusLine = 1..2;
+  Blueprint = Array[1..NUMCIRCLES] of CircleDef;
+
+  NameNode  = Record (* Linked list node for names of Onyx employees *)
+                Name : String;
+                Next : ^NameNode;
+              End;
+
+  NameList  = Record (* Circular list of name nodes, tracking the count *)
+                Curr    : ^NameNode;    (* Current name being processed *)
+                Count   : Integer;      (* Total name nodes in the list *)
+              End;
 
 VAR
+  PHeap     : ^Integer;         (* pSource heap pointer *)
   Answer    : Char;             (* Input to see if user wishes to continue *)
   I         : Integer;
   Logo      : Blueprint;
+  NameCount : Integer;
+  Names     : NameList;
+  Borders   : Array[0..1] of Border;
 
 (*
  * PrepMoveXY
@@ -193,6 +211,21 @@ END; (* DrawOnyx *)
 
 
 (*
+ * ChooseSide:
+ * Ginen an input index, return the left/right screen border.
+ *)
+FUNCTION ChooseSide(I : Integer) : Border;
+
+BEGIN
+  (* TODO: Maybe do this randomly *)
+  Case (I MOD 2) of
+    0: ChooseSide := LEFT;
+    1: ChooseSide := RIGHT
+  End
+END; (* ChooseSide *)
+
+
+(*
  * DropName:
  * Animate the letters in Name so they fall down the side of the screen.
  *)
@@ -231,7 +264,6 @@ BEGIN
 END; (* DropName *)
 
 
-
 (*
  * INITIALIZE
  * Initializes globals and sets up screen and
@@ -249,9 +281,44 @@ PROCEDURE Initialize;
     End;
   END;
 
+  (* Use a larger arc count for larger circles, but always multiples of 360 *)
+  PROCEDURE InitNames;
+  VAR
+    Name       : String;
+    NameFile   : File of Char;
+    Prev, Curr : ^NameNode;
+
+  BEGIN
+    (* Ensure we have at least one name in the list *)
+    New(Curr);
+    Curr^.Name := ONYXTECH;
+    Curr^.Next := Curr;
+    Names.Curr := Curr;
+    Names.Count := 1;
+
+    (* Add in the employee names from the team file *)
+    Reset(NameFile, TEAMFILENAME);
+    ReadLn(NameFile, Name);
+    While NOT EOF(NameFile) Do
+    Begin
+      Prev := Curr;
+      New(Curr);
+      Curr^.Name := Name;
+      Curr^.Next := Names.Curr;         (* Circular list points back to head *)
+      Prev^.Next := Curr;               (* Old end node points to new name *)
+      Names.Count := Names.Count + 1;
+      ReadLn(NameFile, Name)
+    End;
+    Close(NameFile);
+  END;
+
 BEGIN
-  Answer := 'Y';
+  Mark(PHeap);
   Randomize;
+  Answer := 'Y';
+
+  InitTurtle;
+  Status(1, 'Welcome to Onyx!');
 
   (* Use a larger arc count for larger circles, but always multiples of 360 *)
   InitCircle(1, 139, 100,  6, 10, FULL);    (* Inner... *)
@@ -259,9 +326,20 @@ BEGIN
   InitCircle(3, 134,  74, 16, 15, SE);
   InitCircle(4, 132,  54, 20, 18, NW);      (* ...outer *)
 
-  InitTurtle;
-  Status(1, 'Welcome to Onyx!');
+  InitNames;                                (* Get the team members *)
 END; (* Initialize *)
+
+
+(*
+ * FINALIZE
+ * Releases memory to the system in preparation for program termination.
+ *)
+PROCEDURE Finalize;
+BEGIN
+  Release(PHeap);
+  Names.Curr := NIL;
+  Names.Count := 0
+END; (* Finalize *)
 
 
 (*
@@ -271,13 +349,21 @@ BEGIN
   Initialize;
   While (Answer <> 'N') AND (Answer <>  'n') Do
   Begin
+    (* Draw logo in the centre *)
     For I := 1 TO NUMCIRCLES Do
       With Logo[I] Do
         MakeCircle(X, Y, ArcLen, ArcCnt, Gap);
 
     DrawOnyx(110, Logo[NUMCIRCLES].Y - LETTERHEIGHT - LETTERMARGIN);
-    DropName('Jane Doe', RIGHT);
-    DropName('Dennis Drown', LEFT);
+
+    (* Run through team members *)
+    For I := 1 TO Names.Count Do
+    Begin
+      DropName(Names.Curr^.Name, ChooseSide(I));
+      Names.Curr := Names.Curr^.Next
+    End;
+
+    (* Do it again...? *)
     Read(KEYBOARD, Answer)
   End;
 
@@ -285,4 +371,5 @@ BEGIN
   TextMode;
   WriteLn;
   WriteLn('Thank you from Onyx Technologies!');
+  Finalize;
 END.
