@@ -47,13 +47,12 @@ TYPE
               End;
 
 VAR
+  KeepGoing : Char;             (* Input to see if user wishes to continue *)
   PHeap     : ^Integer;         (* pSource heap pointer *)
-  Answer    : Char;             (* Input to see if user wishes to continue *)
   I         : Integer;
   Logo      : Blueprint;
   NameCount : Integer;
   Names     : NameList;
-  Borders   : Array[0..1] of Border;
 
 (*
  * PrepMoveXY
@@ -304,7 +303,7 @@ PROCEDURE AnimateName(Name : String);
 
 BEGIN
   (* Are we dropping or sliding? *)
-  Case (I (*Random*) MOD 2) of
+  Case (Random MOD 2) of
     0: DropName(Name, ChooseSide(LEFT, RIGHT));
     1: SlideName(Name, ChooseSide(TOP, BOTTOM))
   End
@@ -332,7 +331,7 @@ PROCEDURE Initialize;
   PROCEDURE InitNames;
   VAR
     Name       : String;
-    NameFile   : File of Char;
+    NameFile   : Text;
     Prev, Curr : ^NameNode;
 
   BEGIN
@@ -345,16 +344,15 @@ PROCEDURE Initialize;
 
     (* Add in the employee names from the team file *)
     Reset(NameFile, TEAMFILENAME);
-    ReadLn(NameFile, Name);
     While NOT EOF(NameFile) Do
     Begin
+      ReadLn(NameFile, Name);
       Prev := Curr;
       New(Curr);
       Curr^.Name := Name;
       Curr^.Next := Names.Curr;         (* Circular list points back to head *)
       Prev^.Next := Curr;               (* Old end node points to new name *)
-      Names.Count := Names.Count + 1;
-      ReadLn(NameFile, Name)
+      Names.Count := Names.Count + 1
     End;
     Close(NameFile);
   END;
@@ -362,7 +360,7 @@ PROCEDURE Initialize;
 BEGIN
   Mark(PHeap);
   Randomize;
-  Answer := 'Y';
+  KeepGoing := 'Y';
 
   InitTurtle;
   Status(1, 'Welcome to Onyx!');
@@ -394,24 +392,21 @@ END; (* Finalize *)
  *)
 BEGIN
   Initialize;
-  While (Answer <> 'N') AND (Answer <>  'n') Do
+  (* Draw logo in the centre *)
+  For I := 1 TO NUMCIRCLES Do
+    With Logo[I] Do
+      MakeCircle(X, Y, ArcLen, ArcCnt, Gap);
+  DrawOnyx(110, Logo[NUMCIRCLES].Y - LETTERHEIGHT - LETTERMARGIN);
+
+  (* Run through team members *)
+  While (Names.Curr <> NIL) AND (KeepGoing <> 'N') AND (KeepGoing <>  'n') Do
   Begin
-    (* Draw logo in the centre *)
-    For I := 1 TO NUMCIRCLES Do
-      With Logo[I] Do
-        MakeCircle(X, Y, ArcLen, ArcCnt, Gap);
-
-    DrawOnyx(110, Logo[NUMCIRCLES].Y - LETTERHEIGHT - LETTERMARGIN);
-
-    (* Run through team members *)
-    For I := 1 TO Names.Count Do
-    Begin
-      AnimateName(Names.Curr^.Name);
-      Names.Curr := Names.Curr^.Next
-    End;
+    AnimateName(Names.Curr^.Name);
+    Names.Curr := Names.Curr^.Next;
 
     (* Do it again...? *)
-    Read(KEYBOARD, Answer)
+    If KeyPress Then
+      Read(KEYBOARD, KeepGoing)
   End;
 
   (* Say goodbye... *)
