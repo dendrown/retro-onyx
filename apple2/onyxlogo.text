@@ -211,10 +211,83 @@ END; (* DrawOnyx *)
 
 
 (*
- * DropName:
+ * LeftRightX:
+ * Determine the Y value to write at the top or the bottom of the screen.
+ *)
+FUNCTION LeftRightX(Side : Border) : Integer;
+
+BEGIN
+  Case Side of
+    LEFT:   LeftRightX := 0;
+    RIGHT:  LeftRightX := WCHARWIDTH * 34;  (* * (WCHARMAX-1) *)
+  End
+END; (* LeftRightX *)
+
+
+(*
+ * TopBottomY:
+ * Determine the Y value to write at the top or the bottom of the screen.
+ *)
+FUNCTION TopBottomY(Side : Border) : Integer;
+
+BEGIN
+  Case Side of
+    TOP:    TopBottomY := YMAX - TEXTLINE;
+    BOTTOM: TopBottomY := 1;
+  End
+END; (* TopBottomY *)
+
+
+(*
+ * MoveChar:
+ * Animate letters so they slide left across the top/bottom of the screen.
+ *)
+PROCEDURE MoveCharXY(PrevX, PrevY, X, Y : Integer; Ch : Char);
+
+BEGIN
+  PrepEraseXY(PrevX, Y);
+  WChar(' ');
+
+  PrepDrawXY(X, Y);
+  WChar(Ch)
+END; (* MoveChar *)
+
+
+(*
+ * FloatUp:
+ * Animate the letters in Name so they rise up the side of the screen.
+ *)
+PROCEDURE FloatUp(Name : String; Side : Border);
+VAR
+  L, X, Y, PrevY, Top : Integer;
+
+BEGIN
+  (*
+   * The final letter falls all the way to the bottom & then they stack.
+   * Letters go down either the left side or the right side of the screen.
+   *)
+  X := LeftRightX(Side);
+  Top := YMAX - (2 * TEXTLINE);
+
+  (* Run through the name so the first letter is on the top. *)
+  For L := 1 To Length(Name) Do
+  Begin
+    PrevY := 0;
+    For Y := TEXTLINE To Top Do
+    Begin
+      MoveCharXY(X, PrevY, X, Y, Name[L]);
+      PrevY := Y
+    End;
+    Top := Top - TEXTLINE
+  End
+END; (* FloatUp *)
+
+
+(*
+ * DropDown:
  * Animate the letters in Name so they fall down the side of the screen.
  *)
-PROCEDURE DropName(Name : String; Side : Border);
+PROCEDURE DropDown(Name : String; Side : Border);
 VAR
   L, X, Y, PrevY, Bottom : Integer;
 
@@ -223,37 +296,59 @@ BEGIN
    * The final letter falls all the way to the bottom & then they stack.
    * Letters go down either the left side or the right side of the screen.
    *)
+  X := LeftRightX(Side);
   Bottom := TEXTLINE;
-  Case Side of
-    LEFT:   X := 0;
-    RIGHT:  X := WCHARWIDTH * 34;   (* * (WCHARMAX-1) *)
-  End;
 
   (* Run backwards through the name so the last letter is on the bottom. *)
   For L := Length(Name) DownTo 1 Do
   Begin
     PrevY := 0;
-    For Y := YMAX - TEXTLINE DownTo Bottom Do
+    For Y := YMAX - TEXTLINE + 1 DownTo Bottom Do
     Begin
-      If PrevY > 0 Then
-      Begin
-        PrepEraseXY(X, PrevY);
-        WChar(' ')
-      End;
-      PrepDrawXY(X, Y);
-      WChar(Name[L]);
+      MoveCharXY(X, PrevY, X, Y, Name[L]);
       PrevY := Y
     End;
     Bottom := Bottom + TEXTLINE
   End
-END; (* DropName *)
+END; (* DropDown *)
 
 
 (*
- * SlideName:
- * Animate letters in Name so they slide across the top/bottom of the screen.
+ * SlideLeft:
+ * Animate letters so they slide left across the top/bottom of the screen.
  *)
-PROCEDURE SlideName(Name : String; Side : Border);
+PROCEDURE SlideLeft(Name : String; Side : Border);
+VAR
+  L, X, Y, PrevX, Left, Right : Integer;
+
+BEGIN
+  (*
+   * The first letter slides all the way to the left & the others follow it.
+   * Letters go across either the top side or the bottom of the screen.
+   *)
+  Y := TopBottomY(Side);
+  Left := WCHARWIDTH;               (* Leave room for name drop on left *)
+  Right := XMAX - (2 * WCHARWIDTH); (*                  ... and on right *)
+
+  (* Run backwards through the name so the last letter is on the bottom. *)
+  For L := 1 To Length(Name) Do
+  Begin
+    PrevX := 0;
+    For X := Right DownTo Left Do
+    Begin
+      MoveCharXY(PrevX, Y, X, Y, Name[L]);
+      PrevX := X
+    End;
+    Left := Left + WCHARWIDTH
+  End
+END; (* SlideLeft *)
+
+
+(*
+ * SlideRight:
+ * Animate letters so they slide right across the top/bottom of the screen.
+ *)
+PROCEDURE SlideRight(Name : String; Side : Border);
 VAR
   L, X, Y, PrevX, Right : Integer;
 
@@ -263,10 +358,7 @@ BEGIN
    * it. Letters go across either the top side or the bottom of the screen.
    *)
   Right := XMAX - (2 * WCHARWIDTH);     (* Leave room for name drop on right *)
-  Case Side of
-    TOP:    Y := YMAX - TEXTLINE;
-    BOTTOM: Y := 1;
-  End;
+  Y := TopBottomY(Side);
 
   (* Run backwards through the name so the last letter is on the bottom. *)
   For L := Length(Name) DownTo 1 Do
@@ -274,16 +366,12 @@ BEGIN
     PrevX := 0;
     For X := 0 To Right Do
     Begin
-      PrepEraseXY(PrevX, Y);
-      WChar(' ');
-
-      PrepDrawXY(X, Y);
-      WChar(Name[L]);
+      MoveCharXY(PrevX, Y, X, Y, Name[L]);
       PrevX := X
     End;
     Right := Right - WCHARWIDTH
   End
-END; (* DropName *)
+END; (* SlideRight *)
 
 
 (*
@@ -303,9 +391,11 @@ PROCEDURE AnimateName(Name : String);
 
 BEGIN
   (* Are we dropping or sliding? *)
-  Case (Random MOD 2) of
-    0: DropName(Name, ChooseSide(LEFT, RIGHT));
-    1: SlideName(Name, ChooseSide(TOP, BOTTOM))
+  Case (Random MOD 4) of
+    0: FloatUp(Name, ChooseSide(LEFT, RIGHT));
+    1: DropDown(Name, ChooseSide(LEFT, RIGHT));
+    2: SlideLeft(Name, ChooseSide(TOP, BOTTOM));
+    3: SlideRight(Name, ChooseSide(TOP, BOTTOM))
   End
 END; (* AnimateName *)
 
@@ -360,7 +450,7 @@ PROCEDURE Initialize;
 BEGIN
   Mark(PHeap);
   Randomize;
-  KeepGoing := 'Y';
+  KeepGoing := ' ';
 
   InitTurtle;
   Status(1, 'Welcome to Onyx!');
@@ -399,7 +489,7 @@ BEGIN
   DrawOnyx(110, Logo[NUMCIRCLES].Y - LETTERHEIGHT - LETTERMARGIN);
 
   (* Run through team members *)
-  While (Names.Curr <> NIL) AND (KeepGoing <> 'N') AND (KeepGoing <>  'n') Do
+  While (Names.Curr <> NIL) AND (KeepGoing <> 'Q') AND (KeepGoing <>  'q') Do
   Begin
     AnimateName(Names.Curr^.Name);
     Names.Curr := Names.Curr^.Next;
