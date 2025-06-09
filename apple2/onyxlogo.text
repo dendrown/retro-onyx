@@ -245,7 +245,7 @@ END; (* TopBottomY *)
 PROCEDURE MoveCharXY(PrevX, PrevY, X, Y : Integer; Ch : Char);
 
 BEGIN
-  PrepEraseXY(PrevX, Y);
+  PrepEraseXY(PrevX, PrevY);
   WChar(' ');
 
   PrepDrawXY(X, Y);
@@ -272,8 +272,8 @@ BEGIN
   (* Run through the name so the first letter is on the top. *)
   For L := 1 To Length(Name) Do
   Begin
-    PrevY := 0;
-    For Y := TEXTLINE To Top Do
+    PrevY := TEXTLINE;
+    For Y := PrevY To Top Do
     Begin
       MoveCharXY(X, PrevY, X, Y, Name[L]);
       PrevY := Y
@@ -302,8 +302,8 @@ BEGIN
   (* Run backwards through the name so the last letter is on the bottom. *)
   For L := Length(Name) DownTo 1 Do
   Begin
-    PrevY := 0;
-    For Y := YMAX - TEXTLINE + 1 DownTo Bottom Do
+    PrevY := YMAX - TEXTLINE ;
+    For Y := PrevY DownTo Bottom Do
     Begin
       MoveCharXY(X, PrevY, X, Y, Name[L]);
       PrevY := Y
